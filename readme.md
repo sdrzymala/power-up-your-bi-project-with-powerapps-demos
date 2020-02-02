@@ -1,5 +1,5 @@
 # Description
-Demos from presentation called "Power uo your BI project with PowerApps"
+Demos from presentation called "Power uo your BI project with PowerApps"    
 If you have any question please feel free to contact me at slawomirdrzymala@outlook.com
 ![](misc/title_slide.png)
 

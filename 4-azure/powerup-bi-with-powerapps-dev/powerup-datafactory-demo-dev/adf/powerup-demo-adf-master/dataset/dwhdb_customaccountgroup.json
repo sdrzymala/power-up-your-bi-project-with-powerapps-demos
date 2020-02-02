@@ -1,0 +1,39 @@
+{
+	"name": "dwhdb_customaccountgroup",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "linked_service_sql_dwhdb",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [
+			{
+				"name": "CustomAccountGroupKey",
+				"type": "varchar"
+			},
+			{
+				"name": "AccountGroup",
+				"type": "varchar"
+			},
+			{
+				"name": "AccountSubGroup",
+				"type": "varchar"
+			},
+			{
+				"name": "ChangedAt",
+				"type": "datetime2",
+				"scale": 7
+			},
+			{
+				"name": "ChangedBy",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "powerapp_stage",
+			"table": "CustomAccountGroup"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

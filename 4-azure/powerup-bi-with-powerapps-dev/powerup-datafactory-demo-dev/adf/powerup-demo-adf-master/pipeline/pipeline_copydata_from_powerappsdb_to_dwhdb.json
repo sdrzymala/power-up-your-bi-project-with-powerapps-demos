@@ -1,0 +1,344 @@
+{
+	"name": "pipeline_copydata_from_powerappsdb_to_dwhdb",
+	"properties": {
+		"activities": [
+			{
+				"name": "powerappsdb_to_dwhdb_fiscalperiod",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"queryTimeout": "02:00:00"
+					},
+					"sink": {
+						"type": "SqlServerSink",
+						"preCopyScript": "truncate table [powerapp_stage].[FiscalPeriod];"
+					},
+					"enableStaging": false,
+					"parallelCopies": 1,
+					"dataIntegrationUnits": 4,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "YearMonth",
+									"type": "Int32"
+								},
+								"sink": {
+									"name": "YearMonth",
+									"type": "Int32"
+								}
+							},
+							{
+								"source": {
+									"name": "Year",
+									"type": "String"
+								},
+								"sink": {
+									"name": "Year",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "MonthNumber",
+									"type": "String"
+								},
+								"sink": {
+									"name": "MonthNumber",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "MonthName",
+									"type": "String"
+								},
+								"sink": {
+									"name": "MonthName",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "IsApproved",
+									"type": "Boolean"
+								},
+								"sink": {
+									"name": "IsApproved",
+									"type": "Boolean"
+								}
+							},
+							{
+								"source": {
+									"name": "ClosingDate",
+									"type": "DateTime"
+								},
+								"sink": {
+									"name": "ClosingDate",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"name": "ChangedAt",
+									"type": "DateTime"
+								},
+								"sink": {
+									"name": "ChangedAt",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"name": "ChangedBy",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ChangedBy",
+									"type": "String"
+								}
+							}
+						]
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "powerappsdb_fiscalperiod",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "dwhdb_fiscalperiod",
+						"type": "DatasetReference"
+					}
+				]
+			},
+			{
+				"name": "powerappsdb_to_dwhdb_customaccountgroups",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"queryTimeout": "02:00:00"
+					},
+					"sink": {
+						"type": "SqlServerSink",
+						"preCopyScript": "TRUNCATE TABLE [powerapp_stage].[CustomAccountGroup];"
+					},
+					"enableStaging": false,
+					"parallelCopies": 1,
+					"dataIntegrationUnits": 4,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "CustomAccountGroupKey",
+									"type": "String"
+								},
+								"sink": {
+									"name": "CustomAccountGroupKey",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "AccountGroup",
+									"type": "String"
+								},
+								"sink": {
+									"name": "AccountGroup",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "AccountSubGroup",
+									"type": "String"
+								},
+								"sink": {
+									"name": "AccountSubGroup",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "ChangedAt",
+									"type": "DateTime"
+								},
+								"sink": {
+									"name": "ChangedAt",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"name": "ChangedBy",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ChangedBy",
+									"type": "String"
+								}
+							}
+						]
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "powerappsdb_customaccountgroup",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "dwhdb_customaccountgroup",
+						"type": "DatasetReference"
+					}
+				]
+			},
+			{
+				"name": "merge_dwhdb_customaccountgroups_stage_to_dim",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "powerappsdb_to_dwhdb_customaccountgroups",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[etl].[spMergeCustomAccountGroup]"
+				},
+				"linkedServiceName": {
+					"referenceName": "linked_service_sql_dwhdb",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "powerappsdb_to_dwhdb_customaccountgroupsmap",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"queryTimeout": "02:00:00"
+					},
+					"sink": {
+						"type": "SqlServerSink",
+						"preCopyScript": "TRUNCATE TABLE [powerapp_stage].[CustomAccountGroupMapAccount];"
+					},
+					"enableStaging": false,
+					"parallelCopies": 1,
+					"dataIntegrationUnits": 4
+				},
+				"inputs": [
+					{
+						"referenceName": "powerappsdb_customaccountgroupmapaccount",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "dwhdb_customaccountgroupmapaccount",
+						"type": "DatasetReference"
+					}
+				]
+			},
+			{
+				"name": "merge_dwhdb_customaccountgroupsmap_stage_to_dim",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "powerappsdb_to_dwhdb_customaccountgroupsmap",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[etl].[spMergeCustomAccountGroupMapAccount]"
+				},
+				"linkedServiceName": {
+					"referenceName": "linked_service_sql_dwhdb",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "merge_dwhdb_fiscalperiod_stage_to_dim",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "powerappsdb_to_dwhdb_fiscalperiod",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[etl].[spMergeFiscalPeriod]"
+				},
+				"linkedServiceName": {
+					"referenceName": "linked_service_sql_dwhdb",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"annotations": []
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

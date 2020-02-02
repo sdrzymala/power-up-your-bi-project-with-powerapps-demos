@@ -1,0 +1,52 @@
+{
+	"name": "powerappsdb_fiscalperiod",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "linked_service_sql_powerappsdb",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [
+			{
+				"name": "YearMonth",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "Year",
+				"type": "varchar"
+			},
+			{
+				"name": "MonthNumber",
+				"type": "varchar"
+			},
+			{
+				"name": "MonthName",
+				"type": "varchar"
+			},
+			{
+				"name": "IsApproved",
+				"type": "bit"
+			},
+			{
+				"name": "ClosingDate",
+				"type": "date"
+			},
+			{
+				"name": "ChangedAt",
+				"type": "datetime2",
+				"scale": 7
+			},
+			{
+				"name": "ChangedBy",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "powerapp",
+			"table": "FiscalPeriod"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

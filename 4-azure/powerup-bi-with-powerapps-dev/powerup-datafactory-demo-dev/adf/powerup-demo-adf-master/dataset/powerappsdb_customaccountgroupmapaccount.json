@@ -1,0 +1,35 @@
+{
+	"name": "powerappsdb_customaccountgroupmapaccount",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "linked_service_sql_powerappsdb",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [
+			{
+				"name": "CustomAccountGroupKey",
+				"type": "varchar"
+			},
+			{
+				"name": "AccountCodeAlternateKey",
+				"type": "varchar"
+			},
+			{
+				"name": "ChangedAt",
+				"type": "datetime2",
+				"scale": 7
+			},
+			{
+				"name": "ChangedBy",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "powerapp",
+			"table": "CustomAccountGroupMapAccount"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

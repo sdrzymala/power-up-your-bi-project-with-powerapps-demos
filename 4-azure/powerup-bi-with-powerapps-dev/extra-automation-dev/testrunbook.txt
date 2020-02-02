@@ -1,0 +1,112 @@
+# Parameters
+$connectionName = Get-AutomationVariable -Name 'powerupRefreshSSASConnectionName'
+$TenantId = Get-AutomationVariable -Name 'powerupRefreshSSASTenantId'
+$CredentialName = Get-AutomationVariable -Name 'powerupRefreshSSASCredential'
+$Server = Get-AutomationVariable -Name 'powerupRefreshSSASServer'
+$DatabaseName = Get-AutomationVariable -Name 'powerupRefreshSSASDatabaseName'
+$RolloutEnvironment = Get-AutomationVariable -Name 'powerupRefreshSSASRolloutEnvironment'
+$CheckLoopTime = Get-AutomationVariable -Name 'powerupRefreshADFCheckLoopTime'
+$ResourceGroupName = Get-AutomationVariable -Name 'powerupRefreshADFResourceGroupName'
+$DataFactoryName = Get-AutomationVariable -Name 'powerupRefreshADFDataFactoryName'
+$PipelineName = Get-AutomationVariable -Name 'powerupRefreshADFPipelineName'
+$Credential = Get-AutomationPSCredential -Name $CredentialName
+
+
+
+# Variables
+$nl = [Environment]::NewLine
+$isLoginCompleted = $false
+$isADFPipelineCompleted = $false
+$isTabularProcessingCompleted = $false
+$errorMessage = ""
+
+
+
+# Login
+try
+{
+    Write-Output "Logging in to Azure..."
+
+    # Get the connection "AzureRunAsConnection "
+    $servicePrincipalConnection=Get-AutomationConnection -Name $connectionName         
+
+    $AzureRmAccount = Add-AzureRmAccount `
+        -ServicePrincipal `
+        -TenantId $servicePrincipalConnection.TenantId `
+        -ApplicationId $servicePrincipalConnection.ApplicationId `
+        -CertificateThumbprint $servicePrincipalConnection.CertificateThumbprint 
+    $isLoginCompleted = $true
+    Write-Output "Logging in to Azure completed..."
+}
+catch 
+{
+    $isLoginCompleted = $false
+    Write-Output "Logging in to Azure error..."
+    $errorMessage = $errorMessage + $nl + $nl + $nl + "Login: " + $_.Exception + $nl + $nl + $nl
+}
+
+
+
+# ADF pipeline
+try
+{
+    Write-Output "Running pipeline..."
+
+    $RunID = Invoke-AzureRmDataFactoryV2Pipeline -ResourceGroupName $ResourceGroupName -DataFactoryName $DataFactoryName -PipelineName $PipelineName
+    $RunInfo = Get-AzureRmDataFactoryV2PipelineRun -ResourceGroupName $ResourceGroupName -DataFactoryName $DataFactoryName -PipelineRunId $RunID
+    $sw =  [system.diagnostics.stopwatch]::StartNew()
+    While (($Pipeline = Get-AzureRmDataFactoryV2PipelineRun -ResourceGroupName $ResourceGroupName -DataFactoryName $DataFactoryName -PipelineRunId $RunID |Select -ExpandProperty "Status") -eq "InProgress")
+    {
+        $RunInfo = Get-AzureRmDataFactoryV2PipelineRun -ResourceGroupName $ResourceGroupName -DataFactoryName $DataFactoryName -PipelineRunId $RunID
+        Start-Sleep $CheckLoopTime
+    }
+    $sw.Stop()
+    $PipelineRunInfo = Get-AzureRmDataFactoryV2PipelineRun -ResourceGroupName $ResourceGroupName -DataFactoryName $DataFactoryName -PipelineRunId $RunID
+    if ($PipelineRunInfo.Status -ne "Succeeded")
+    {                    
+        throw "There was an error with running pipeline: $($PipelineRunInfo.PipelineName). Returned message was:`n$($PipelineRunInfo.Message)"
+    }
+    $isADFPipelineCompleted = $true
+
+    Write-Output "Running pipeline completed..."
+}
+catch
+{
+    $isADFPipelineCompleted = $false
+    Write-Output "Running pipeline error..."
+    $errorMessage + $nl + $nl + $nl + "ADF pipeline: " + $_.Exception + $nl + $nl + $nl
+}
+
+
+
+
+# Process Full SSAS
+try
+{
+    Write-Output "Processing tabular..."
+
+    # Log in to Azure Analysis Services using the Azure AD Service Principal
+    $azureAnalysisServicesAccount = Add-AzureAnalysisServicesAccount -Credential $Credential -ServicePrincipal -TenantId $TenantId -RolloutEnvironment $RolloutEnvironment
+    $processASDatabase = Invoke-ProcessASDatabase -Server $Server -DatabaseName $DatabaseName -RefreshType "Full" -ErrorAction Stop
+    $isTabularProcessingCompleted = $true
+
+    Write-Output "Processing tabular completed..."
+}
+catch
+{
+    $isTabularProcessingCompleted = $false
+    Write-Output "Processing tabular error..."
+    $errorMessage + $nl + $nl + $nl + "Process tabular: "  + $_.Exception + $nl + $nl + $nl
+}
+
+
+
+if ($isLoginCompleted -eq $false -Or $isADFPipelineCompleted -eq $false -Or $isTabularProcessingCompleted -eq $false)
+{
+    $FullErrorMessage = "There was an error in the runbook execution:" + $nl + $nl + $nl + $errorMessage
+    Write-Error –Message $FullErrorMessage
+}
+else
+{
+    Write-Output "Fully completed..."
+}

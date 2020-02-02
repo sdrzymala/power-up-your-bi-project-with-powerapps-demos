@@ -1,0 +1,12 @@
+{
+	"name": "linked_service_sql_powerappsdb",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "SqlServer",
+		"typeProperties": {
+			"connectionString": "integrated security=False;data source=powerup-bi-with-powerapps-dev-sqlserv.database.windows.net;initial catalog=powerappdb-dev;user id=sdrzymala",
+			"encryptedCredential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIlBPV0VSVVAtREFUQUZBQ1RPUlktREVNTy1ERVZfNTE1NjYzZTEtMTJiOC00YzU4LWE5NWYtODRhMjExMDM4MWI2Ig0KfQ=="
+		}
+	}
+}

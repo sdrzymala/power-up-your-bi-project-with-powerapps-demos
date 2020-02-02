@@ -1,0 +1,180 @@
+#r "Newtonsoft.Json"
+#r "Microsoft.AnalysisServices.Tabular.DLL"
+#r "Microsoft.AnalysisServices.Core.DLL"
+#r "Microsoft.Azure.Management.DataFactory.dll"
+#r "Microsoft.Azure.Management.ResourceManager.dll"
+#r "Microsoft.IdentityModel.Clients.ActiveDirectory.dll"
+#r "Microsoft.Rest.ClientRuntime.dll"
+#r "Microsoft.Rest.ClientRuntime.Azure.dll"
+
+using System.Net;
+using Newtonsoft.Json;
+using System.Configuration;
+using Microsoft.AnalysisServices.Tabular;
+using System.Security.Principal;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using Microsoft.Azure.Management.DataFactory;
+using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Microsoft.Rest.ClientRuntime;
+using Microsoft.Rest.ClientRuntime.Azure;
+
+
+public static async Task<HttpResponseMessage> Run(HttpRequestMessage req, TraceWriter log)
+{
+    log.Info("C# HTTP trigger function processed a request.");
+
+    ADFPipelineStatus aDFPipelineStatus = new ADFPipelineStatus();
+    TabularProcessingStatus tabularProcessingStatus = new TabularProcessingStatus();
+
+    int sleepIntervalSeconds = 2;
+    int maxWaitTimeSeconds = 120;
+    int currentWaitTimeSeconds = 0;
+
+
+
+
+    // Set variables
+    string tabularSrvConnectionString = Environment.GetEnvironmentVariable("AzureASConnString");
+    string tabularDatabaseName = "demo-dev";
+    string tenantID = Environment.GetEnvironmentVariable("tenantID");
+    string applicationId = Environment.GetEnvironmentVariable("applicationId");
+    string authenticationKey = Environment.GetEnvironmentVariable("authenticationKey");
+    string subscriptionId = Environment.GetEnvironmentVariable("subscriptionId");
+    string resourceGroup = "powerup-bi-with-powerapps-dev";
+    string dataFactoryName = "powerup-datafactory-demo-dev";
+    string pipelineName = "pipeline_copydata_from_powerappsdb_to_dwhdb";
+    
+
+
+
+    // Authenticate and create a data factory management client
+    log.Info("Starting ADF pipeline");
+
+    var context = new Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext("https://login.windows.net/" + tenantID);
+    Microsoft.IdentityModel.Clients.ActiveDirectory.ClientCredential cc = new Microsoft.IdentityModel.Clients.ActiveDirectory.ClientCredential(applicationId, authenticationKey);
+    Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationResult result = context.AcquireTokenAsync(
+        "https://management.azure.com/", cc).Result;
+
+    Microsoft.Rest.ServiceClientCredentials cred = new Microsoft.Rest.TokenCredentials(result.AccessToken);
+    var client = new DataFactoryManagementClient(cred)
+    {
+        SubscriptionId = subscriptionId
+    };
+
+    var pipelineRunID = client.Pipelines.CreateRun(resourceGroup, dataFactoryName, pipelineName);
+    while (true)
+    {
+        var pipelineRun = client.PipelineRuns.Get(resourceGroup, dataFactoryName, pipelineRunID.RunId);
+        log.Info("Current ADF pipeline status: " + pipelineRun.Status);
+
+        if (pipelineRun.Status == "Queued" || pipelineRun.Status == "InProgress")
+        {
+            System.Threading.Thread.Sleep(sleepIntervalSeconds * 1000);
+        }
+        else if (pipelineRun.Status == "Succeeded")
+        {
+            aDFPipelineStatus.ADFMessage = "Completed succesfully";
+            aDFPipelineStatus.ADFStatus = true;
+            break;
+        }
+        else if (currentWaitTimeSeconds >= maxWaitTimeSeconds)
+        {
+            aDFPipelineStatus.ADFMessage = "Timeout";
+            aDFPipelineStatus.ADFStatus = false;
+            break; //timeout
+        }
+        else
+        {
+            aDFPipelineStatus.ADFMessage = "other: " + pipelineRun.Status;
+            aDFPipelineStatus.ADFStatus = false;
+            break;
+        }
+        currentWaitTimeSeconds += sleepIntervalSeconds;
+    }
+
+
+
+
+    log.Info("Starting Azure tabular processing");
+    if (aDFPipelineStatus.ADFStatus == true)
+    {
+        // process tabular only if the adf will load the data
+        try
+        {
+                Microsoft.AnalysisServices.Tabular.Server asSrv = new Microsoft.AnalysisServices.Tabular.Server();
+                asSrv.Connect(tabularSrvConnectionString);
+                Microsoft.AnalysisServices.Tabular.Database db = asSrv.Databases[tabularDatabaseName];
+                Model m = db.Model;
+                m.RequestRefresh(RefreshType.Full);
+                db.Model.SaveChanges();
+                asSrv.Disconnect();
+                tabularProcessingStatus.TabularStatus = true;
+                tabularProcessingStatus.TabularMessage = "Completed succesfully";
+        }
+        catch (Exception e)
+        {
+                log.Info($"Error while processing tabular error:\n {e.ToString()}");
+                tabularProcessingStatus.TabularStatus = false;
+                tabularProcessingStatus.TabularMessage = "there was an error during tabular processing: \n" + e.ToString();
+        }
+
+    }
+    else
+    {
+        tabularProcessingStatus.TabularStatus = false;
+        tabularProcessingStatus.TabularMessage = "tabular process not started because ADF didn't completed";
+    }
+
+
+
+  
+    PowerupDemoStatus runStatus = new PowerupDemoStatus();
+    runStatus.FunctionStatus = aDFPipelineStatus.ADFStatus == true && tabularProcessingStatus.TabularStatus ? true : false;
+    runStatus.ADFPipelineStatus = aDFPipelineStatus;
+    runStatus.TabularProcessingStatus = tabularProcessingStatus;
+    var json = JsonConvert.SerializeObject(runStatus, Formatting.Indented);
+
+
+    return new HttpResponseMessage(HttpStatusCode.OK) 
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+    // return runStatus.FunctionStatus == false
+    //     ? new HttpResponseMessage(HttpStatusCode.BadRequest) 
+    //     {
+    //         Content = new StringContent(json, Encoding.UTF8, "application/json")
+    //     }
+    //     : new HttpResponseMessage(HttpStatusCode.OK) 
+    //     {
+    //         Content = new StringContent(json, Encoding.UTF8, "application/json")
+    //     };
+
+}
+
+
+
+
+public class PowerupDemoStatus
+{
+    public bool FunctionStatus { get; set; }
+    public ADFPipelineStatus ADFPipelineStatus { get; set; }
+    public TabularProcessingStatus TabularProcessingStatus { get; set; }
+}
+
+
+public class ADFPipelineStatus
+{
+    public bool ADFStatus { get; set; }
+    public string ADFMessage { get; set; }
+}
+
+
+public class TabularProcessingStatus
+{
+    public bool TabularStatus { get; set; }
+    public string TabularMessage { get; set; }
+}
